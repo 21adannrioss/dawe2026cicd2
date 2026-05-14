@@ -1,5 +1,5 @@
 <?php
-// Connexió a la base de dades
+// Conexió a la base de dades
 $host = getenv('DB_HOST') ?: 'db';
 $dbname = getenv('DB_NAME') ?: 'taskmanager';
 $user = getenv('DB_USER') ?: 'taskuser';
