@@ -1,38 +1,56 @@
-name: Desplegament amb Docker Hub
+name: Desplegament a AWS EC2 amb Docker Hub (deploy31)
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout del codi
+        [cite_start]uses: actions/checkout@v4 [cite: 203]
 
-      - name: Login Docker Hub
+      - name: Login a Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build i push imatge
+      - name: Construir i pujar la imatge a Docker Hub
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/taskmanager:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest
 
-      - name: Deploy a EC2
-        uses: appleboy/ssh-action@v1.0.3
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout del codi
+        [cite_start]uses: actions/checkout@v4 [cite: 203]
+
+      - name: Copiar docker-compose al servidor
+        [cite_start]uses: appleboy/scp-action@v0.1.7 [cite: 206]
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          [cite_start]host: ${{ secrets.EC2_HOST }} [cite: 178]
+          [cite_start]username: ${{ secrets.EC2_USER }} [cite: 179]
+          [cite_start]key: ${{ secrets.EC2_SSH_KEY }} [cite: 180]
+          source: "docker-compose.yml"
+          target: "~/"
+
+      - name: Executar comandes al servidor per SSH
+        [cite_start]uses: appleboy/ssh-action@v1.0.3 [cite: 210]
+        with:
+          [cite_start]host: ${{ secrets.EC2_HOST }} [cite: 178]
+          [cite_start]username: ${{ secrets.EC2_USER }} [cite: 179]
+          [cite_start]key: ${{ secrets.EC2_SSH_KEY }} [cite: 180]
           script: |
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/taskmanager:latest
-            docker stop app || true
-            docker rm app || true
-            docker run -d -p 80:80 --name app ${{ secrets.DOCKERHUB_USERNAME }}/taskmanager:latest
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            
+            export IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/task-manager:latest"
+            export PORT=80
+            
+            docker compose -f ~/docker-compose.yml up -d --pull always --no-build
